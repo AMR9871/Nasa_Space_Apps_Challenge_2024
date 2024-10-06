@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>About Us</title>
+    <style>
+        /* Ensure body takes full height */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Parallax background effect */
+        body {
+            background-image: url('about.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed; /* Creates the parallax effect */
+            color: rgba(0, 0, 0, 0.8); /* Transparent text */
+        }
+
+        /* Flexbox container to ensure footer stays at the bottom */
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            justify-content: space-between;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: rgba(249, 244, 244, 0.5); /* Semi-transparent container background */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            opacity: 0.9; /* Transparency of container */
+        }
+
+        h1 {
+            text-align: center;
+            color: rgba(0, 0, 0, 0.9); /* Semi-transparent heading */
+        }
+
+        p {
+            line-height: 1.6;
+            margin: 20px 0;
+            color: rgba(0, 0, 0, 0.7); /* Transparent paragraph text */
+        }
+
+        /* Footer styling */
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent footer background */
+            color: rgba(255, 255, 255, 0.8); /* Semi-transparent footer text */
+            opacity: 0.8;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        <div class="container">
+            <h1>About Us</h1>
+            <p>We are ExoVision, a team of five space enthusiasts driven by curiosity and a shared love for uncovering the mysteries of the universe. Our mission is to push the boundaries of space exploration and data analysis, combining our diverse expertise to create innovative solutions for the ExoSky Challenge. 
+
+                Our team is united by a passion for space, science, and technology. We are fascinated by:
+                
+                - Exoplanet discovery and the search for extraterrestrial life
+                
+                - The intersection of data science and astronomy
+                
+                - Exploring the vast, uncharted regions of space through data visualization
+                
+                - Building innovative, impactful tools that can contribute to NASA’s space missions
+                
+                Let’s explore the skies together and create something that leaves a lasting impact!</p>
+
+            
+        </div>
+
+        <footer>
+            Copyright &copy; 2024 ExoVision 1.3
+        </footer>
+    </div>
+
+</body>
+</html>
