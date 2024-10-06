@@ -1,0 +1,68 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body, html {
+    height: 100%;
+    font-family: Arial, sans-serif;
+    color: white;
+    overflow: hidden; /* Prevent scrolling */
+  }
+  
+  #canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1; /* Keep the 3D background behind other content */
+  }
+  
+  .explore-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+  
+  h1 {
+    font-size: 4rem; /* Increased font size for more emphasis */
+    margin-bottom: 50px; /* More space between the title and buttons */
+    color: #007bff;
+  }
+  
+  .buttons-container {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 100px; /* Adds padding to the sides to keep buttons aligned */
+  }
+  
+  .button {
+    display: inline-block;
+    padding: 40px 80px; /* Bigger padding to make the boxes larger */
+    border: 3px solid #007bff;
+    color: #007bff;
+    text-decoration: none;
+    font-size: 2rem; /* Larger font size for better readability */
+    transition: all 0.3s ease;
+  }
+  
+  .button-left {
+    margin-right: auto;
+  }
+  
+  .button-right {
+    margin-left: auto;
+  }
+  
+  .button:hover {
+    background-color: #007bff;
+    color: white;
+  }
+  
