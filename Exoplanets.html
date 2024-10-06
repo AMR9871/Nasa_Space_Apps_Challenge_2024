@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Planet Explorer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #planet-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 18px;
+            z-index: 10;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input type="text" id="search-input" placeholder="Search for a planet...">
+        <button id="search-button">Search</button>
+        <button id="back-button" style="display: none;">Back</button>
+    </div>
+    <div id="planet-info">Click on a planet to see its details.</div>
+
+    <!-- Import Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Raycaster for hover and click detection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Original camera position to zoom back to
+        const originalCameraPosition = { x: 0, y: 0, z: 500 };
+
+        // Array to hold planet objects
+        const planets = [];
+
+        // Planet data (including solar system planets)
+        const planetsData = [
+            { name: "Mercury", discoveryMethod: "N/A", numPlanets: 1, year: "Ancient times" },
+            { name: "Venus", discoveryMethod: "N/A", numPlanets: 1, year: "Ancient times" },
+            { name: "Earth", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "Mars", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "Jupiter", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "Saturn", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "Uranus", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "Neptune", discoveryMethod: "N/A", numPlanets: 1, year: "N/A" },
+            { name: "AU Mic b", discoveryMethod: "Transit", numPlanets: 3, year: 2020 },
+            { name: "AU Mic c", discoveryMethod: "Transit", numPlanets: 3, year: 2021 },
+            { name: "BD-14 3065 b", discoveryMethod: "Transit", numPlanets: 1, year: 2024 },
+            { name: "DS Tuc A b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "GJ 1252 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "HD 110082 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "HD 110113 b", discoveryMethod: "Transit", numPlanets: 2, year: 2024 },
+            { name: "HD 110113 c", discoveryMethod: "Transit", numPlanets: 2, year: 2024 },
+            { name: "HD 110113 d", discoveryMethod: "Transit", numPlanets: 2, year: 2024 },
+            { name: "HD 110621 b", discoveryMethod: "Transit", numPlanets: 1, year: 2024 },
+            { name: "HD 110850 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "HD 110850 c", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "HD 137496 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "HD 137496 c", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "HD 63433 b", discoveryMethod: "Transit", numPlanets: 2, year: 2020 },
+            { name: "HD 63433 c", discoveryMethod: "Transit", numPlanets: 2, year: 2020 },
+            { name: "HD 73583 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "HD 73583 c", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "HD 98401 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "L 168-9 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "L 98-59 b", discoveryMethod: "Transit", numPlanets: 3, year: 2019 },
+            { name: "L 98-59 c", discoveryMethod: "Transit", numPlanets: 3, year: 2019 },
+            { name: "L 98-59 d", discoveryMethod: "Transit", numPlanets: 3, year: 2019 },
+            { name: "L 98-59 e", discoveryMethod: "Transit", numPlanets: 3, year: 2020 },
+            { name: "LP 714-47 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "LP 714-47 c", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "LTT 1445 A b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "LTT 9779 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "MASCARA-4 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "NGTS-13 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "NGTS-14 A b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "NGTS-19 b", discoveryMethod: "Transit", numPlanets: 1, year: 2022 },
+            { name: "NGTS-5 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "NGTS-6 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "NGTS-8 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "TOI-1136 b", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1136 c", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1136 d", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1136 e", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1136 f", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1136 g", discoveryMethod: "Transit", numPlanets: 6, year: 2021 },
+            { name: "TOI-1231 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "TOI-1231 c", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "TOI-175 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-164 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-174 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-184 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-189 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-199 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-29 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-30 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-31 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-39 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-43 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-44 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-47 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-50 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-51 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-61 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-67 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-73 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-74 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-75 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-77 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-80 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-82 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-85 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-88 b", discoveryMethod: "Transit", numPlanets: 1, year: 2021 },
+            { name: "WASP-91 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-94 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-95 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-98 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-99 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-100 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-103 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-104 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-105 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-106 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-107 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-108 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-109 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-110 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-112 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-113 b", discoveryMethod: "Transit", numPlanets: 1, year: 2019 },
+            { name: "WASP-114 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-115 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-116 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-117 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-118 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-119 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-120 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-121 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-122 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-123 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-124 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-125 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-126 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-127 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-128 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-129 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-130 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-131 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-132 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-133 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-134 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-135 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-136 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-137 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-138 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-139 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-140 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-141 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-142 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-143 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-144 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-145 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-146 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-147 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-148 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-149 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-150 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-151 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-152 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-153 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-154 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-155 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-156 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-157 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-158 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-159 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-160 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-161 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-162 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-163 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-164 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-165 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-166 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-167 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-168 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-169 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-170 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-171 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-172 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-173 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-174 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-175 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-176 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-177 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-178 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-179 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-180 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-181 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-182 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-183 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-184 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-185 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-186 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-187 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-188 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-189 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-190 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-191 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-192 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-193 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-194 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-195 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-196 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-197 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-198 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-199 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-200 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-201 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-202 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-203 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-204 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-205 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-206 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-207 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-208 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-209 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-210 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-211 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-212 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-213 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-214 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-215 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-216 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-217 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-218 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-219 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-220 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-221 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-222 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-223 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-224 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-225 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-226 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-227 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-228 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-229 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-230 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-231 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-232 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-233 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-234 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-235 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-236 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-237 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-238 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-239 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-240 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-241 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-242 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-243 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-244 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-245 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-246 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-247 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-248 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-249 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-250 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-251 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-252 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-253 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-254 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-255 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-256 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-257 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-258 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-259 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-260 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-261 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-262 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-263 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-264 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-265 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-266 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-267 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-268 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-269 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-270 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-271 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-272 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-273 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-274 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-275 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-276 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-277 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-278 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-279 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-280 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-281 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-282 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-283 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-284 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-285 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-286 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-287 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-288 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-289 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-290 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-291 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-292 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-293 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-294 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-295 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-296 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-297 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-298 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-299 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-300 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-301 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-302 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-303 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-304 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-305 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-306 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-307 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-308 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-309 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-310 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-311 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-312 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-313 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-314 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-315 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-316 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-317 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-318 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-319 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-320 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-321 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-322 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-323 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-324 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-325 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-326 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-327 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-328 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-329 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-330 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-331 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-332 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-333 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-334 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-335 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-336 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-337 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-338 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-339 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-340 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-341 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-342 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-343 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-344 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-345 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-346 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-347 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-348 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-349 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-350 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-351 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-352 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-353 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-354 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-355 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-356 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-357 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-358 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-359 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-360 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-361 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-362 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-363 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-364 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-365 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-366 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-367 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-368 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-369 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-370 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-371 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-372 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-373 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-374 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-375 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-376 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-377 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-378 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-379 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-380 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-381 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-382 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-383 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-384 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-385 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-386 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-387 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-388 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-389 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-390 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-391 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-392 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-393 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-394 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-395 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-396 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-397 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-398 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-399 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-400 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-401 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-402 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-403 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-404 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-405 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-406 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-407 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-408 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-409 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-410 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-411 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-412 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-413 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-414 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-415 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-416 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-417 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-418 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-419 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-420 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-421 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-422 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-423 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-424 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-425 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-426 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-427 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-428 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-429 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-430 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-431 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-432 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-433 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-434 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-435 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-436 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-437 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-438 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-439 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-440 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-441 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-442 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-443 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-444 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-445 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-446 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-447 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-448 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-449 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-450 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-451 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-452 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-453 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-454 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-455 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-456 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-457 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-458 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-459 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-460 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-461 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-462 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-463 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-464 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-465 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-466 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-467 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-468 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-469 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-470 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-471 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-472 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-473 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-474 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-475 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-476 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-477 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-478 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-479 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-480 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-481 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-482 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-483 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-484 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-485 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-486 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-487 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-488 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-489 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-490 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-491 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-492 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-493 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-494 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-495 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-496 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-497 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-498 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-499 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-500 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-501 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-502 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-503 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-504 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-505 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-506 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-507 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-508 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-509 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-510 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-511 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-512 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-513 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-514 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-515 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-516 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-517 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-518 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-519 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-520 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-521 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-522 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-523 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-524 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-525 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-526 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-527 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-528 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-529 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-530 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-531 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-532 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-533 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-534 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-535 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-536 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-537 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-538 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-539 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-540 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-541 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-542 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-543 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-544 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-545 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-546 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-547 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-548 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-549 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-550 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-551 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-552 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-553 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-554 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-555 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-556 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-557 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-558 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-559 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-560 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-561 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-562 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-563 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-564 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-565 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-566 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-567 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-568 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-569 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-570 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-571 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-572 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-573 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-574 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-575 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-576 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-577 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-578 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-579 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-580 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-581 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-582 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-583 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-584 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-585 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-586 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-587 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-588 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-589 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-590 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-591 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-592 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-593 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-594 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-595 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-596 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-597 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-598 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-599 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-600 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-601 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-602 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-603 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-604 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-605 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-606 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-607 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-608 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-609 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-610 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-611 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-612 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-613 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-614 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-615 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-616 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-617 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-618 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-619 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-620 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-621 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-622 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-623 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-624 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-625 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-626 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-627 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-628 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-629 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-630 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-631 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-632 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-633 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-634 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-635 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-636 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-637 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-638 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-639 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-640 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-641 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-642 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-643 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-644 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-645 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-646 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-647 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-648 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-649 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-650 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-651 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-652 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-653 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-654 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-655 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-656 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-657 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-658 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-659 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-660 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-661 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-662 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-663 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-664 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-665 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-666 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-667 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-668 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-669 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-670 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-671 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-672 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-673 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-674 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-675 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-676 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-677 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-678 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-679 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-680 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-681 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-682 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-683 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-684 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-685 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-686 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-687 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-688 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-689 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-690 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-691 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-692 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-693 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-694 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-695 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-696 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-697 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-698 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-699 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-700 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-701 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-702 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-703 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-704 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-705 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-706 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-707 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-708 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-709 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-710 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-711 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-712 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-713 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-714 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-715 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-716 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-717 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-718 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 },
+            { name: "WASP-719 b", discoveryMethod: "Transit", numPlanets: 1, year: 2020 } ]
+// Create planet material
+let planetMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,  
+            wireframe: false 
+        });
+
+        // Create planets using data
+        planetsData.forEach(planet => {
+            const planetGeometry = new THREE.SphereGeometry(1, 32, 32);
+            const planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
+            planetMesh.position.set(
+                (Math.random() - 0.5) * 1000,  // Random x position in 3D space
+                (Math.random() - 0.5) * 1000,  // Random y position
+                (Math.random() - 0.5) * 1000   // Random z position
+            );
+            planets.push(planetMesh);
+            scene.add(planetMesh);
+        });
+
+        // Camera position
+        camera.position.set(originalCameraPosition.x, originalCameraPosition.y, originalCameraPosition.z);
+
+        let clickedPlanet = null;
+        let targetZoom = null;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!clickedPlanet) {
+                scene.rotation.y += 0.00005;  // Reduced rotation speed
+            } else if (targetZoom) {
+                camera.position.lerp(targetZoom, 0.1);  // Adjusted zoom speed
+                if (camera.position.distanceTo(targetZoom) < 0.1) {
+                    targetZoom = null;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle mouse move to update raycaster
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Handle click on planets
+        window.addEventListener('click', (event) => {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(planets);
+
+            if (intersects.length > 0) {
+                const clickedObject = intersects[0];
+                clickedPlanet = clickedObject.object;
+
+                const distance = 10; // Distance from planet
+                targetZoom = new THREE.Vector3(clickedPlanet.position.x, clickedPlanet.position.y, clickedPlanet.position.z + distance);
+
+                clickedPlanet.scale.set(5, 5, 5);  // Scale up the clicked planet
+
+                const planetIndex = planets.indexOf(clickedPlanet);
+                const planetData = planetsData[planetIndex];
+
+                document.getElementById('planet-info').innerHTML = `
+                    <strong>Planet Name:</strong> ${planetData.name}<br>
+                    <strong>Discovery Year:</strong> ${planetData.year}<br>
+                    <strong>Discovery Method:</strong> ${planetData.discoveryMethod}
+                `;
+
+                document.getElementById('back-button').style.display = 'block';
+            }
+        });
+
+        // Search functionality
+        document.getElementById('search-button').addEventListener('click', () => {
+            const searchQuery = document.getElementById('search-input').value.toLowerCase();
+            const foundPlanet = planetsData.find(p => p.name.toLowerCase() === searchQuery);
+
+            if (foundPlanet) {
+                const planetMesh = planets[planetsData.indexOf(foundPlanet)];
+                targetZoom = new THREE.Vector3(planetMesh.position.x, planetMesh.position.y, planetMesh.position.z + 10);
+                clickedPlanet = planetMesh;
+
+                clickedPlanet.scale.set(5, 5, 5);  // Scale up the searched planet
+
+                document.getElementById('planet-info').innerHTML = `
+                    <strong>Planet Name:</strong> ${foundPlanet.name}<br>
+                    <strong>Discovery Year:</strong> ${foundPlanet.year}<br>
+                    <strong>Discovery Method:</strong> ${foundPlanet.discoveryMethod}
+                `;
+
+                document.getElementById('back-button').style.display = 'block';
+            } else {
+                alert('Planet not found!');
+            }
+        });
+
+        // Back button functionality
+        document.getElementById('back-button').addEventListener('click', () => {
+            clickedPlanet = null;
+            targetZoom = null;  // Reset zoom target
+            camera.position.set(originalCameraPosition.x, originalCameraPosition.y, originalCameraPosition.z); 
+
+            planets.forEach(planet => planet.scale.set(1, 1, 1));  // Reset size
+
+            document.getElementById('planet-info').innerHTML = 'Click on a planet to see its details.';
+            document.getElementById('back-button').style.display = 'none';
+        });
+
+        // Resize window handler
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>            
